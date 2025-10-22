@@ -1,0 +1,13 @@
+[font]
+size = 15.0
+
+[window]
+opacity = 1.0
+
+[window.dimensions]
+columns = 120
+lines = 36
+
+[window.padding]
+x = 6
+y = 6
