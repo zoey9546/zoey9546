@@ -1,0 +1,118 @@
+---
+# macos setup playbook
+# run with: ansible-playbook macos-setup.yml --ask-become-pass
+
+- name: setup macos
+  hosts: localhost
+  connection: local
+  
+  vars:
+    homebrew_taps:
+      - homebrew/cask
+      - homebrew/cask-fonts
+    
+    homebrew_packages:
+      - htop
+    
+    homebrew_casks:
+      - chromium
+    
+    mas_apps:
+      - { name: "Xcode", id: 497799835 }
+      - { name: "1Password", id: 1333542190 }
+    
+    oh_my_zsh_theme: "robbyrussell"
+    
+  tasks:
+    - name: Check if Homebrew is installed
+      stat:
+        path: /opt/homebrew/bin/brew
+      register: homebrew_check
+      
+    - name: Install Homebrew (Apple Silicon)
+      shell: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      when: not homebrew_check.stat.exists and ansible_architecture == "arm64"
+    
+    - name: Add Homebrew to PATH for Apple Silicon
+      lineinfile:
+        path: ~/.zprofile
+        line: 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+        create: yes
+      when: ansible_architecture == "arm64"
+    
+    - name: Tap Homebrew repositories
+      community.general.homebrew_tap:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ homebrew_taps }}"
+    
+    - name: Install Homebrew packages
+      community.general.homebrew:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ homebrew_packages }}"
+    
+    - name: Install Homebrew casks
+      community.general.homebrew_cask:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ homebrew_casks }}"
+      ignore_errors: yes
+    
+    - name: Check if Oh My Zsh is installed
+      stat:
+        path: ~/.oh-my-zsh
+      register: oh_my_zsh_check
+    
+    - name: Install Oh My Zsh
+      shell: |
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+      when: not oh_my_zsh_check.stat.exists
+    
+    - name: Set Oh My Zsh theme
+      lineinfile:
+        path: ~/.zshrc
+        regexp: '^ZSH_THEME='
+        line: 'ZSH_THEME="{{ oh_my_zsh_theme }}"'
+    
+    - name: Set macOS defaults - Show hidden files
+      community.general.osx_defaults:
+        domain: com.apple.finder
+        key: AppleShowAllFiles
+        type: bool
+        value: true
+    
+    - name: Set macOS defaults - Show file extensions
+      community.general.osx_defaults:
+        domain: NSGlobalDomain
+        key: AppleShowAllExtensions
+        type: bool
+        value: true
+    
+    - name: Set macOS defaults - Disable auto-correct
+      community.general.osx_defaults:
+        domain: NSGlobalDomain
+        key: NSAutomaticSpellingCorrectionEnabled
+        type: bool
+        value: false
+    
+    - name: Create common directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - ~/.config
+    
+    - name: Restart affected applications
+      shell: |
+        killall Finder
+        killall Dock
+      ignore_errors: yes
+    
+    - name: Display completion message
+      debug:
+        msg: 
+          - "macos setup complete"
+          - "restart terminal"
