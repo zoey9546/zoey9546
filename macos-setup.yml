@@ -41,12 +41,6 @@
         create: yes
       when: ansible_architecture == "arm64"
     
-    - name: Tap Homebrew repositories
-      community.general.homebrew_tap:
-        name: "{{ item }}"
-        state: present
-      loop: "{{ homebrew_taps }}"
-    
     - name: Install Homebrew packages
       community.general.homebrew:
         name: "{{ item }}"
